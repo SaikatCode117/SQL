@@ -1,0 +1,112 @@
+
+select * from protfolioproject.coviddeaths
+;
+
+-- Select the data that we are going to be using
+select location, date, total_cases, total_deaths, population
+from protfolioproject.coviddeaths
+order by 1,2
+;
+
+
+-- Looking at Total Cases vs Total Death
+select location, date, total_cases, total_deaths, (total_deaths/total_cases)*100 as DeathPercentage
+from protfolioproject.coviddeaths
+where location like '%India%'
+and continent is not null
+order by 1,2
+;
+
+-- shows what Percentages of people got covid
+select location, date, population, total_cases, (total_cases/population)*100 as PeopleGotCovid
+from protfolioproject.coviddeaths
+-- where location like '%India%' 
+order by 1,2
+;
+
+-- Looking at the country with Highest Infection rate compared to Population
+select location, population, MAX(total_cases) AS HighestInfectionCount,
+MAX((total_cases/population))*100 as PercentPupulationGotCovid
+from protfolioproject.coviddeaths
+group by location, population
+order by PercentPupulationGotCovid desc
+;
+
+-- Showing countries with highest death count per population 
+select location, MAX(total_deaths) as TotalDeathsCOUNT
+from protfolioproject.coviddeaths
+group by location
+order by TotalDeathsCOUNT desc 
+;
+
+-- Global number
+select continent, MAX(total_deaths) AS TotalDeathCOUNT
+from protfolioproject.coviddeaths
+where continent IS NOT NULL
+group by continent
+order by TotalDeathCOUNT desc 
+;
+
+-- Death percentage in India
+select sum(new_cases) as TotalCases, sum(new_deaths) as TotalDeaths, sum(new_deaths)/sum(new_cases)*100 as DeathPercentage
+from protfolioproject.coviddeaths
+ where location like '%india%'
+and continent is not null
+-- group by date
+order by 1,2
+;
+
+
+-- Total population vs vaccications
+-- USE CTE
+with PopvsVac (continent, location, date, population, new_vaccications, RollingPeopleVaccinated)
+as
+(
+select dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations,
+sum(vac.new_vaccinations) over(partition by dea.location order by dea.location, dea.date) as RollingPeopleVaccinated
+from protfolioproject.coviddeaths dea
+join protfolioproject.covidvaccinations vac
+	on dea.location = vac.location
+    and dea.date = vac.date
+    where dea.continent IS NOT NULL
+    order by 2,3
+)
+select *, (RollingPeopleVaccinated/population)*100 as PopulationVsVaccitions
+from PopvsVac
+;
+
+
+--------------------------------------------------------------------
+ -- Temp table
+drop table if exists #PercentPopulationVaccinated
+ create table #PercentPopulationVaccinated
+ (
+ continent nvarchar(255),
+ location nvarchar (255),
+ Date datetime,
+ Population numeric,
+ New_vaccination numeric,
+ RollingPeopleVaccinated numeric
+ )
+insert into #PercentPopulationVaccinated
+select dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations,
+sum(vac.new_vaccinations) over(partition by dea.location order by dea.location, dea.date) as RollingPeopleVaccinated
+from protfolioproject.coviddeaths dea
+join protfolioproject.covidvaccinations vac
+	on dea.location = vac.location
+    and dea.date = vac.date
+    where dea.continent IS NOT NULL
+    -- order by 2,3
+select *, (RollingPeopleVaccinated/population)*100 as PopulationVsVaccitions
+from #PercentPopulationVaccinated
+;
+
+create view PercentPopulationVaccinated as
+select dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations,
+sum(vac.new_vaccinations) over(partition by dea.location order by dea.location, dea.date) as RollingPeopleVaccinated
+from protfolioproject.coviddeaths dea
+join protfolioproject.covidvaccinations vac
+	on dea.location = vac.location
+    and dea.date = vac.date
+    where dea.continent IS NOT NULL
+    ;
